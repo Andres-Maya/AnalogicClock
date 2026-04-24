@@ -4,12 +4,14 @@ Frontend del reloj analógico — construido 100 % con tkinter (sin HTML/CSS).
 Toda la interfaz gráfica y textos están en ESPAÑOL.
 """
 
+
 import math
 import datetime
 import tkinter as tk
 from tkinter import font as tkfont
 
 from clock_engine import ClockEngine, ClockHand
+from timer_engine import StopwatchEngine, TimerEngine
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -154,14 +156,111 @@ class RelojAnalogico:
         "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"
     ]
 
+    MODOS = ["Reloj", "Cronómetro", "Temporizador"]
+
     def __init__(self):
         self._engine: ClockEngine = ClockEngine()
+        self._stopwatch = StopwatchEngine()
+        self._timer = TimerEngine(60)
+        self._modo = 0  # 0=reloj, 1=cronómetro, 2=temporizador
         self._root: tk.Tk = tk.Tk()
         self._canvas: tk.Canvas | None = None
         self._hand_renderers: list[HandRenderer] = []
         self._setup_ventana()
         self._draw_esfera_estatica()
         self._setup_manecillas()
+        self._setup_controles()
+        self._root.bind("1", lambda e: self._cambiar_modo(0))
+        self._root.bind("2", lambda e: self._cambiar_modo(1))
+        self._root.bind("3", lambda e: self._cambiar_modo(2))
+
+    def _setup_controles(self):
+        # Botones para cambiar de modo
+        frame = tk.Frame(self._root, bg=COLOR_FONDO)
+        frame.place(x=20, y=VENTANA_ALTO-48)
+        for i, nombre in enumerate(self.MODOS):
+            b = tk.Button(frame, text=nombre, width=11, command=lambda idx=i: self._cambiar_modo(idx))
+            b.grid(row=0, column=i, padx=2)
+
+        # Etiqueta de modo activo
+        self._modo_label = tk.Label(self._root, text="Modo: Reloj", fg=COLOR_TITULO, bg=COLOR_FONDO, font=("Courier", 10, "bold"))
+        self._modo_label.place(x=VENTANA_ANCHO-170, y=VENTANA_ALTO-48)
+
+        # Controles de cronómetro y temporizador
+        self._controles_frame = tk.Frame(self._root, bg=COLOR_FONDO)
+        self._controles_frame.place(x=VENTANA_ANCHO//2 - 120, y=VENTANA_ALTO-48)
+        self._boton_start = tk.Button(self._controles_frame, text="Iniciar", width=8, command=self._accion_start)
+        self._boton_pause = tk.Button(self._controles_frame, text="Pausar", width=8, command=self._accion_pause)
+        self._boton_reset = tk.Button(self._controles_frame, text="Reset", width=8, command=self._accion_reset)
+        self._entrada_tiempo = tk.Entry(self._controles_frame, width=8, justify="center")
+        self._boton_set = tk.Button(self._controles_frame, text="Set", width=5, command=self._accion_set_tiempo)
+        self._actualizar_controles()
+
+    def _actualizar_controles(self):
+        # Oculta todos los controles
+        for widget in self._controles_frame.winfo_children():
+            widget.grid_forget()
+        if self._modo == 1:  # Cronómetro
+            self._boton_start.grid(row=0, column=0, padx=2)
+            self._boton_pause.grid(row=0, column=1, padx=2)
+            self._boton_reset.grid(row=0, column=2, padx=2)
+        elif self._modo == 2:  # Temporizador
+            self._entrada_tiempo.grid(row=0, column=0, padx=2)
+            self._boton_set.grid(row=0, column=1, padx=2)
+            self._boton_start.grid(row=0, column=2, padx=2)
+            self._boton_pause.grid(row=0, column=3, padx=2)
+            self._boton_reset.grid(row=0, column=4, padx=2)
+
+    def _cambiar_modo(self, idx):
+        self._modo = idx
+        self._modo_label.config(text=f"Modo: {self.MODOS[idx]}")
+        self._actualizar_controles()
+        # Reset cronómetro/temporizador al cambiar de modo
+        if idx == 1:
+            self._stopwatch.reset()
+        elif idx == 2:
+            self._timer.reset()
+
+    def _accion_start(self):
+        if self._modo == 1:
+            self._stopwatch.start()
+        elif self._modo == 2:
+            self._timer.start()
+
+    def _accion_pause(self):
+        if self._modo == 1:
+            self._stopwatch.pause()
+        elif self._modo == 2:
+            self._timer.pause()
+
+    def _accion_reset(self):
+        if self._modo == 1:
+            self._stopwatch.reset()
+        elif self._modo == 2:
+            self._timer.reset()
+
+    def _accion_set_tiempo(self):
+        # Espera formato HH:MM:SS o MM:SS o SS
+        valor = self._entrada_tiempo.get().strip()
+        try:
+            partes = [int(x) for x in valor.split(":")]
+            if len(partes) == 3:
+                total = partes[0]*3600 + partes[1]*60 + partes[2]
+            elif len(partes) == 2:
+                total = partes[0]*60 + partes[1]
+            elif len(partes) == 1:
+                total = partes[0]
+            else:
+                total = 60
+            if total > 0:
+                self._timer.set(total)
+                self._timer.reset()
+        except Exception:
+            pass
+
+    def _cambiar_modo(self, idx):
+        self._modo = idx
+        self._modo_label.config(text=f"Modo: {self.MODOS[idx]}")
 
     # ------------------------------------------------------------------
     # Window setup
@@ -331,14 +430,31 @@ class RelojAnalogico:
     # ------------------------------------------------------------------
 
     def _tick(self) -> None:
-        now = datetime.datetime.now()
-        angles = self._engine.snapshot(now)
+        if self._modo == 0:  # Reloj
+            now = datetime.datetime.now()
+            angles = self._engine.snapshot(now)
+            hora_digital = now.strftime("%H:%M:%S")
+            nombre_dia = self._DIAS[now.weekday()]
+            nombre_mes = self._MESES[now.month]
+            fecha_str  = f"{nombre_dia}, {now.day} de {nombre_mes} de {now.year}"
+        elif self._modo == 1:  # Cronómetro
+            elapsed = int(self._stopwatch.get_elapsed())
+            h, m, s = elapsed // 3600, (elapsed % 3600) // 60, elapsed % 60
+            hora_digital = f"{h:02}:{m:02}:{s:02}"
+            angles = self._engine.snapshot(datetime.datetime(2000,1,1,h,m,s))
+            fecha_str = "Cronómetro"
+        else:  # Temporizador
+            remaining = int(self._timer.get_remaining())
+            h, m, s = remaining // 3600, (remaining % 3600) // 60, remaining % 60
+            hora_digital = f"{h:02}:{m:02}:{s:02}"
+            angles = self._engine.snapshot(datetime.datetime(2000,1,1,h,m,s))
+            fecha_str = "Temporizador"
 
-        # Draw hands in correct Z-order
+        # Dibujar manecillas
         for renderer in self._hand_renderers:
             renderer.draw(angles[renderer._hand.name])
 
-        # Center jewel (drawn on top of all hands)
+        # Centro
         jewel_r = 7
         self._canvas.delete("centro")
         self._canvas.create_oval(
@@ -354,14 +470,8 @@ class RelojAnalogico:
             tags="centro",
         )
 
-        # Digital clock
-        hora_digital = now.strftime("%H:%M:%S")
+        # Digital
         self._canvas.itemconfig(self._digital_id, text=hora_digital)
-
-        # Date in Spanish
-        nombre_dia = self._DIAS[now.weekday()]
-        nombre_mes = self._MESES[now.month]
-        fecha_str  = f"{nombre_dia}, {now.day} de {nombre_mes} de {now.year}"
         self._canvas.itemconfig(self._fecha_id, text=fecha_str)
 
         self._root.after(INTERVALO_MS, self._tick)
