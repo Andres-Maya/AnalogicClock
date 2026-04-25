@@ -211,16 +211,6 @@ class RelojAnalogico:
             self._boton_pause.grid(row=0, column=3, padx=2)
             self._boton_reset.grid(row=0, column=4, padx=2)
 
-    def _cambiar_modo(self, idx):
-        self._modo = idx
-        self._modo_label.config(text=f"Modo: {self.MODOS[idx]}")
-        self._actualizar_controles()
-        # Reset cronómetro/temporizador al cambiar de modo
-        if idx == 1:
-            self._stopwatch.reset()
-        elif idx == 2:
-            self._timer.reset()
-
     def _accion_start(self):
         if self._modo == 1:
             self._stopwatch.start()
@@ -261,6 +251,11 @@ class RelojAnalogico:
     def _cambiar_modo(self, idx):
         self._modo = idx
         self._modo_label.config(text=f"Modo: {self.MODOS[idx]}")
+        self._actualizar_controles()
+        if idx == 1:
+            self._stopwatch.reset()
+        elif idx == 2:
+            self._timer.reset()
 
     # ------------------------------------------------------------------
     # Window setup
@@ -449,6 +444,9 @@ class RelojAnalogico:
             hora_digital = f"{h:02}:{m:02}:{s:02}"
             angles = self._engine.snapshot(datetime.datetime(2000,1,1,h,m,s))
             fecha_str = "Temporizador"
+            if self._timer.is_finished() and self._timer.is_running():
+                self._timer.pause()
+                self._root.bell()
 
         # Dibujar manecillas
         for renderer in self._hand_renderers:
