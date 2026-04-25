@@ -304,9 +304,8 @@ class AnalogClockApp:
             digital_text = f"{h:02}:{m:02}:{s:02}"
             angles = self._engine.snapshot(datetime.datetime(2000, 1, 1, h, m, s))
             sub_text = "Timer"
-            if self._timer.is_finished() and self._timer.is_running():
-                self._timer.pause()
-                self._root.bell()
+            if self._timer.is_finished():
+                self._timer.check_and_play_alarm()
 
         for renderer in self._hand_renderers:
             renderer.draw(angles[renderer.hand.name])

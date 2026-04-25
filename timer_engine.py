@@ -6,6 +6,7 @@ Countdown timer engine: counts down from a configurable duration to zero.
 from __future__ import annotations
 
 import time
+import winsound
 
 
 class TimerEngine:
@@ -29,6 +30,7 @@ class TimerEngine:
         self._remaining: float = duration_sec
         self._end_time: float | None = None
         self._running: bool = False
+        self._alarm_played: bool = False
 
     # ------------------------------------------------------------------
     # Configuration
@@ -40,6 +42,7 @@ class TimerEngine:
         self._remaining = duration_sec
         self._end_time = None
         self._running = False
+        self._alarm_played = False
 
     # ------------------------------------------------------------------
     # Controls
@@ -62,6 +65,7 @@ class TimerEngine:
         self._remaining = self._duration
         self._end_time = None
         self._running = False
+        self._alarm_played = False
 
     # ------------------------------------------------------------------
     # Queries
@@ -84,3 +88,8 @@ class TimerEngine:
     def __repr__(self) -> str:
         state = "running" if self._running else "paused"
         return f"TimerEngine({state}, remaining={self.get_remaining():.2f}s)"
+    
+    def check_and_play_alarm(self):
+        if self.is_finished() and not self._alarm_played:
+            winsound.PlaySound("vaca_bailando_duranguense.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
+            self._alarm_played = True
