@@ -52,7 +52,7 @@ class ControlPanel:
         self._current_mode: int = 0
 
         outer = tk.Frame(parent, bg=COL_BG)
-        outer.pack(side=tk.BOTTOM, fill=tk.X, pady=(4, 8))
+        outer.pack(side=tk.BOTTOM, fill=tk.X, pady=(2, 4))
 
         self._build_row1(outer)
         self._build_row2(outer)

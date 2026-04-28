@@ -1,6 +1,7 @@
 """
 hand_renderer.py
 Renders a single clock hand on a Tkinter canvas.
+Supports multiple visual styles via the style parameter.
 """
 
 from __future__ import annotations
@@ -9,9 +10,23 @@ import math
 import tkinter as tk
 from clock_hand import ClockHand
 
-# Colour constants shared across UI modules
+# Fallback colour constants (used when no style palette overrides them)
 COL_FACE_SHADOW: str  = "#070714"
 COL_SECOND_GLOW: str  = "#ff6080"
+
+# Style-specific glow colours for the second hand
+_SECOND_GLOW: dict[str, str] = {
+    "default":    "#ff6080",
+    "minimalist": "#ff4444",
+    "python":     "#FFE873",
+}
+
+# Style-specific shadow colours
+_HAND_SHADOW: dict[str, str] = {
+    "default":    "#070714",
+    "minimalist": "#cccccc",
+    "python":     "#333333",
+}
 
 
 class HandRenderer:
@@ -29,12 +44,14 @@ class HandRenderer:
         cx: int,
         cy: int,
         radius: int,
+        style: str = "default",
     ) -> None:
         self._canvas = canvas
         self._hand = hand
         self._cx = cx
         self._cy = cy
         self._radius = radius
+        self._style = style
         self._tag = f"hand_{hand.name}"
 
     # ------------------------------------------------------------------
@@ -43,8 +60,11 @@ class HandRenderer:
 
     @property
     def hand(self) -> ClockHand:
-        """The clock-hand domain object this renderer is responsible for."""
         return self._hand
+
+    def set_style(self, style: str) -> None:
+        """Switch the active visual style (takes effect on next draw)."""
+        self._style = style
 
     def draw(self, angle_rad: float) -> None:
         """Erase the previous frame and redraw the hand at *angle_rad*."""
@@ -68,10 +88,11 @@ class HandRenderer:
         """Draw a subtle depth shadow (skipped for the thin second hand)."""
         if self._hand.name == "second":
             return
+        shadow_color = _HAND_SHADOW.get(self._style, COL_FACE_SHADOW)
         self._canvas.create_line(
             self._cx + 2, self._cy + 2,
             end_x + 2, end_y + 2,
-            fill=COL_FACE_SHADOW,
+            fill=shadow_color,
             width=self._hand.width + 2,
             capstyle=tk.ROUND,
             tags=self._tag,
@@ -91,10 +112,12 @@ class HandRenderer:
         self, angle_rad: float, end_x: float, end_y: float
     ) -> None:
         """Draw the glow overlay and counter-weight tail for the second hand."""
+        glow_color = _SECOND_GLOW.get(self._style, COL_SECOND_GLOW)
+
         # Glow overlay
         self._canvas.create_line(
             self._cx, self._cy, end_x, end_y,
-            fill=COL_SECOND_GLOW,
+            fill=glow_color,
             width=1,
             capstyle=tk.ROUND,
             tags=self._tag,
@@ -106,7 +129,7 @@ class HandRenderer:
             self._cx, self._cy,
             self._cx + tail_len * math.cos(opp),
             self._cy + tail_len * math.sin(opp),
-            fill=COL_SECOND_GLOW,
+            fill=glow_color,
             width=2,
             capstyle=tk.ROUND,
             tags=self._tag,
