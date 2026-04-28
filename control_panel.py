@@ -12,6 +12,8 @@ from __future__ import annotations
 from typing import Callable
 import tkinter as tk
 
+from sound_manager import SoundManager
+
 # Shared colour tokens
 COL_BG: str    = "#0d0d1a"
 COL_BTN: str   = "#1a1a3a"
@@ -39,12 +41,14 @@ class ControlPanel:
         on_pause: Callable[[], None],
         on_reset: Callable[[], None],
         on_set_timer: Callable[[str], None],
+        sound_manager: SoundManager | None = None,
     ) -> None:
         self._on_mode_change = on_mode_change
         self._on_start = on_start
         self._on_pause = on_pause
         self._on_reset = on_reset
         self._on_set_timer = on_set_timer
+        self._sound_manager: SoundManager = sound_manager or SoundManager()
         self._current_mode: int = 0
 
         outer = tk.Frame(parent, bg=COL_BG)
@@ -52,6 +56,7 @@ class ControlPanel:
 
         self._build_row1(outer)
         self._build_row2(outer)
+        self._build_row3(outer)
         self._refresh_row2()
 
     # ------------------------------------------------------------------
@@ -129,6 +134,46 @@ class ControlPanel:
             command=self._on_reset, **btn_cfg,
         )
 
+    def _build_row3(self, parent: tk.Frame) -> None:
+        """Create the sound-selector row (shown only in Timer mode)."""
+        self._row3 = tk.Frame(parent, bg=COL_BG)
+        # row3 is packed/forgotten by _refresh_row2 — do NOT pack here
+
+        sounds = self._sound_manager.available_sounds
+        self._sound_var = tk.StringVar(
+            value=self._sound_manager.selected_sound or ""
+        )
+
+        tk.Label(
+            self._row3, text="🔔 Alarm:",
+            bg=COL_BG, fg=COL_FG, font=("Courier", 9),
+        ).pack(side=tk.LEFT, padx=(0, 4))
+
+        if sounds:
+            menu = tk.OptionMenu(
+                self._row3,
+                self._sound_var,
+                *sounds,
+                command=self._handle_sound_change,
+            )
+            menu.config(
+                bg=COL_BTN, fg=COL_NUM,
+                activebackground=COL_BTN_ON, activeforeground="#ffffff",
+                relief=tk.FLAT, highlightthickness=0,
+                font=("Courier", 9), width=22,
+            )
+            menu["menu"].config(
+                bg=COL_BTN, fg=COL_NUM,
+                activebackground=COL_BTN_ON, activeforeground="#ffffff",
+                font=("Courier", 9),
+            )
+            menu.pack(side=tk.LEFT)
+        else:
+            tk.Label(
+                self._row3, text="(no .wav files found)",
+                bg=COL_BG, fg=COL_FG, font=("Courier", 9),
+            ).pack(side=tk.LEFT)
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -142,6 +187,7 @@ class ControlPanel:
             self._btn_start.pack(side=tk.LEFT, padx=3)
             self._btn_pause.pack(side=tk.LEFT, padx=3)
             self._btn_reset.pack(side=tk.LEFT, padx=3)
+            self._row3.pack_forget()
 
         elif self._current_mode == 2:  # Timer
             self._entry_duration.pack(side=tk.LEFT, padx=(0, 2))
@@ -149,7 +195,17 @@ class ControlPanel:
             self._btn_start.pack(side=tk.LEFT, padx=3)
             self._btn_pause.pack(side=tk.LEFT, padx=3)
             self._btn_reset.pack(side=tk.LEFT, padx=3)
-        # Mode 0 (Clock): row 2 is intentionally empty.
+            self._row3.pack(pady=(4, 0))
+
+        else:  # Clock: row 2 and row 3 intentionally empty
+            self._row3.pack_forget()
 
     def _handle_set(self) -> None:
         self._on_set_timer(self._entry_duration.get().strip())
+
+    def _handle_sound_change(self, selected_filename: str) -> None:
+        """Called when the user picks a sound from the OptionMenu."""
+        try:
+            self._sound_manager.select(selected_filename)
+        except ValueError:
+            pass  # should never happen — options come from SoundManager itself

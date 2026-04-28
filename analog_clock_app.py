@@ -17,6 +17,7 @@ from stopwatch_engine import StopwatchEngine
 from timer_engine import TimerEngine
 from hand_renderer import HandRenderer
 from control_panel import ControlPanel
+from sound_manager import SoundManager
 
 # ── Layout & palette ──────────────────────────────────────────────────────────
 WINDOW_W: int      = 520
@@ -70,7 +71,8 @@ class AnalogClockApp:
     def __init__(self) -> None:
         self._engine = ClockEngine()
         self._stopwatch = StopwatchEngine()
-        self._timer = TimerEngine(duration_sec=60)
+        self._sound_manager = SoundManager()
+        self._timer = TimerEngine(duration_sec=60, sound_manager=self._sound_manager)
         self._mode: int = 0
 
         self._root = tk.Tk()
@@ -227,6 +229,7 @@ class AnalogClockApp:
             on_pause=self._action_pause,
             on_reset=self._action_reset,
             on_set_timer=self._action_set_timer,
+            sound_manager=self._sound_manager,
         )
 
     # ------------------------------------------------------------------

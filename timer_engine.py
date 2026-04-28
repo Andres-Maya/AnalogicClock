@@ -6,16 +6,22 @@ Countdown timer engine: counts down from a configurable duration to zero.
 from __future__ import annotations
 
 import time
-import winsound
+
+from sound_manager import SoundManager
 
 
 class TimerEngine:
     """
     Counts down from a configurable duration to zero.
 
+    The alarm sound is delegated to a :class:`~sound_manager.SoundManager`
+    instance, which is injected at construction time.  This keeps the
+    timer logic free of any audio concerns (Dependency-Inversion Principle).
+
     Usage::
 
-        timer = TimerEngine(duration_sec=90)
+        sm = SoundManager()
+        timer = TimerEngine(duration_sec=90, sound_manager=sm)
         timer.start()
         remaining = timer.get_remaining()
         if timer.is_finished():
@@ -25,12 +31,27 @@ class TimerEngine:
         timer.set(120)   # change the duration
     """
 
-    def __init__(self, duration_sec: float = 60.0) -> None:
+    def __init__(
+        self,
+        duration_sec: float = 60.0,
+        sound_manager: SoundManager | None = None,
+    ) -> None:
         self._duration: float = duration_sec
         self._remaining: float = duration_sec
         self._end_time: float | None = None
         self._running: bool = False
         self._alarm_played: bool = False
+        # Accept an externally-created SoundManager or create a default one
+        self._sound_manager: SoundManager = sound_manager or SoundManager()
+
+    # ------------------------------------------------------------------
+    # Sound configuration
+    # ------------------------------------------------------------------
+
+    @property
+    def sound_manager(self) -> SoundManager:
+        """The :class:`~sound_manager.SoundManager` used for the alarm."""
+        return self._sound_manager
 
     # ------------------------------------------------------------------
     # Configuration
@@ -89,7 +110,20 @@ class TimerEngine:
         state = "running" if self._running else "paused"
         return f"TimerEngine({state}, remaining={self.get_remaining():.2f}s)"
     
-    def check_and_play_alarm(self):
+    def check_and_play_alarm(self) -> None:
+        """
+        Play the alarm once when the countdown first reaches zero.
+
+        Subsequent calls while :attr:`is_finished` are no-ops until
+        :meth:`reset` or :meth:`set` is called.
+        """
         if self.is_finished() and not self._alarm_played:
-            winsound.PlaySound("vaca_bailando_duranguense.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
+            self._sound_manager.play()
             self._alarm_played = True
+
+    def __repr__(self) -> str:
+        state = "running" if self._running else "paused"
+        return (
+            f"TimerEngine({state}, remaining={self.get_remaining():.2f}s, "
+            f"sound={self._sound_manager.selected_sound!r})"
+        )
